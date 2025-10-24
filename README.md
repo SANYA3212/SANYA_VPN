@@ -15,11 +15,12 @@ The architecture is a straightforward client-server model:
 
 ## Features
 
+*   **Modern UI:** A clean, dark-themed interface for comfortable use.
+*   **Persistent Configuration:** Automatically saves your Raspberry Pi's IP address in a `config.json` file.
 *   **Fully Automated Setup:** Scripts handle installation and configuration on both server and client.
-*   **No Python Dependencies:** Uses only the standard Python library, making the setup lightweight and simple.
-*   **User-Friendly GUI:** The Windows client features a clean interface for connecting, disconnecting, and monitoring the VPN status.
+*   **No Python Dependencies:** Uses only the standard Python library.
+*   **Real-time Status Indicators:** The GUI provides clear, at-a-glance status for the VPN, Tailscale, Raspberry Pi, and internet connectivity.
 *   **Flexible Authentication:** Supports both interactive (browser-based) login and headless authentication using a Tailscale Auth Key (`TS_AUTHKEY`).
-*   **Real-time Diagnostics:** The client GUI shows live status for ping, Tailscale connection, exit node status, and your external IP address.
 *   **Built-in Troubleshooting:** The scripts provide clear, English-language logging to diagnose and resolve common issues.
 
 ## Prerequisites
@@ -29,8 +30,6 @@ The architecture is a straightforward client-server model:
 *   A **Tailscale Account** (a free personal account is sufficient).
 
 ## Installation and Setup
-
-Follow these steps to get SANYA-VPN up and running.
 
 ### 1. Server Setup (Raspberry Pi)
 
@@ -42,67 +41,58 @@ Follow these steps to get SANYA-VPN up and running.
     ```
 
 2.  **Run the Setup Script:**
-    Execute the server setup script with `sudo`. This is required for installing software and modifying network settings.
+    Execute the server setup script with `sudo`.
     ```bash
     sudo python3 server/server_vpn_setup.py
     ```
-    *   The script will first check if Tailscale is installed and, if not, will install it.
-    *   It will then prompt you to log in. An interactive login will provide a URL to open in a browser on any device to authenticate.
-    *   **For headless setup,** you can use an [Auth Key](https://tailscale.com/kb/1085/auth-keys/) from your Tailscale admin console:
+    *   The script will install Tailscale if needed and guide you through the login process.
+    *   **For headless setup,** you can use an [Auth Key](https://tailscale.com/kb/1085/auth-keys/):
         ```bash
         export TS_AUTHKEY="your_auth_key_here"
         sudo -E python3 server/server_vpn_setup.py
         ```
-        *(Note the `-E` flag to preserve the environment variable)*.
 
 3.  **Approve the Exit Node:**
-    After the script completes, you **must** approve the Raspberry Pi as an exit node in your [Tailscale Admin Console](https://login.tailscale.com/admin/machines). Find your Raspberry Pi in the list of machines, click the menu (`...`), and select `Edit route settings...` > `Use as exit node`.
+    After the script completes, you **must** approve the Raspberry Pi as an exit node in your [Tailscale Admin Console](https://login.tailscale.com/admin/machines). Find your Raspberry Pi, click the menu (`...`), and select `Edit route settings...` > `Use as exit node`.
 
 4.  **Get the Tailscale IP:**
-    The script will output the Tailscale IP address of your Raspberry Pi (e.g., `100.x.y.z`). Note this down; you will need it for the client.
+    The script will output the Tailscale IP address of your Raspberry Pi (e.g., `100.x.y.z`). Note this down.
 
 ### 2. Client Setup (Windows)
 
-1.  **Clone or Download the Repository:**
-    Get the project files onto your Windows machine.
+1.  **Clone or Download the Repository.**
 
 2.  **Prepare the Environment:**
-    Navigate to the repository folder and run the environment setup script by double-clicking `install_venv.bat`. This script will:
-    *   Check if Python is installed.
-    *   Create a Python virtual environment in a `venv` folder.
-    *   Check if Tailscale is installed.
+    Double-click `install_venv.bat` to check for Python and create a virtual environment.
 
 3.  **Launch the SANYA-VPN Client:**
-    Double-click `SANYA-VPN.bat` to start the client application.
+    Double-click `SANYA-VPN.bat`.
 
 ## How to Use the Client GUI
 
-1.  **First-Time Login:** If you are not logged into Tailscale, the application will guide you through the interactive browser login.
-2.  **Enter Exit Node IP:** In the "Exit Node IP/Name" field, enter the Tailscale IP address of your Raspberry Pi that you noted earlier.
-3.  **Connect:** Click the **"Connect to Exit Node"** button. The status indicators will update to show the connection progress. Once connected, your external IP should match your Raspberry Pi's public IP.
-4.  **Disconnect:** Click the **"Disconnect"** button to stop routing traffic through the exit node.
+1.  **First-Time Login:** If you are not logged into Tailscale, the application will guide you.
+2.  **Enter Exit Node IP:** In the "Raspberry Pi (Exit Node) IP" field, enter the Tailscale IP address of your server. This will be saved automatically for future use.
+3.  **Connect:** Click **"Enable VPN"**. The status indicators will turn green as the connection is established.
+4.  **Disconnect:** Click **"Disable VPN"** to stop routing traffic through the exit node.
 
 ## Troubleshooting FAQ
 
 *   **Server script fails with a "must be run as root" error.**
-    *   **Solution:** You forgot to use `sudo`. Run the command as `sudo python3 server/server_vpn_setup.py`.
+    *   **Solution:** Use `sudo` to run the script: `sudo python3 server/server_vpn_setup.py`.
 
-*   **Client GUI shows "Connected" but my IP address hasn't changed.**
-    *   **Solution:** Ensure you have approved the Raspberry Pi as an exit node in the Tailscale admin console. This is a mandatory security step. Also, check the logs in the client for any routing errors.
+*   **The status indicator for "Raspberry Pi" is red.**
+    *   **Solution:** Ensure your Raspberry Pi is online and `tailscaled` is running. Verify that the IP address entered in the client is correct.
 
-*   **Client can't find `tailscale.exe`.**
-    *   **Solution:** Make sure Tailscale is installed on your Windows machine in the default location (`C:\Program Files\Tailscale`). If it's not, the client will prompt you to open the download page.
-
-*   **Headless authentication with `TS_AUTHKEY` does not work.**
-    *   **Solution (Server):** Make sure you are using `sudo -E` to preserve the environment variable for the root user.
-    *   **Solution (Client):** Ensure the `TS_AUTHKEY` environment variable is set for the current user before running the `.bat` file.
+*   **VPN status is red ("Disabled") even after connecting.**
+    *   **Solution:** Make sure you have approved the Raspberry Pi as an exit node in the Tailscale admin console. This is a mandatory security step.
 
 ## Files in This Repository
 
 *   `README.md`: This file.
-*   `server/server_vpn_setup.py`: The main automation script for the Raspberry Pi server.
-*   `server/server_commands.txt`: A text file with the key shell commands for manual server setup.
+*   `server/server_vpn_setup.py`: The automation script for the Raspberry Pi.
+*   `server/server_commands.txt`: A list of commands for manual server setup.
 *   `client/client_vpn_setup.py`: The Python script for the Windows GUI client.
-*   `SANYA-VPN.bat`: A batch file to easily launch the client application on Windows.
+*   `client/config.json`: Stores the client configuration (created automatically).
+*   `SANYA-VPN.bat`: A batch file to launch the client on Windows.
 *   `install_venv.bat`: A batch file to prepare the Python environment on Windows.
 *   `LICENSE`: The project's license file.
