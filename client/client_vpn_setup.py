@@ -5,8 +5,8 @@
 SANYA-VPN Client Setup and GUI
 
 This script provides a streamlined graphical user interface (GUI) for managing a
-Tailscale VPN connection on a Windows client. It features a clean dark theme,
-persistent configuration, and accurate, real-time status indicators.
+Tailscale VPN connection on a Windows client. It is designed to be compiled into
+a standalone executable using PyInstaller.
 """
 
 import subprocess
@@ -16,20 +16,22 @@ import logging
 import platform
 import webbrowser
 import threading
-import time
-import queue
 import json
 import locale
 import re
 from tkinter import Tk, Label, Button, Frame, Entry, StringVar, messagebox, Canvas
 
 # --- Constants ---
-APP_TITLE = "SANYA-VPN Client"
+APP_NAME = "SANYA-VPN"
+APP_TITLE = f"{APP_NAME} Client"
 WINDOW_GEOMETRY = "480x320"
-LOG_LEVEL = logging.INFO
-UPDATE_INTERVAL_MS = 3000  # 3 seconds
+UPDATE_INTERVAL_MS = 3000
 TAILSCALE_DOWNLOAD_URL = "https://tailscale.com/download/windows"
-CONFIG_FILE = "config.json"
+
+# --- Configuration Path ---
+# Store config in %APPDATA%\SANYA-VPN\config.json for EXE compatibility
+APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), APP_NAME)
+CONFIG_FILE = os.path.join(APP_DATA_PATH, "config.json")
 
 # --- Dark Theme Colors ---
 Colors = {
@@ -39,8 +41,8 @@ Colors = {
     "SUCCESS": "#98c379", "ERROR": "#e06c75", "OFF": "#5c6370"
 }
 
-# --- Logging Setup ---
-logging.basicConfig(level=logging.CRITICAL, format='%(asctime)s - %(message)s')
+# --- Logging (Disabled for UI) ---
+logging.basicConfig(level=logging.CRITICAL)
 
 # --- Core VPN Logic ---
 class VpnLogic:
@@ -50,10 +52,8 @@ class VpnLogic:
     def _find_tailscale_exe(self):
         for path_var in ['ProgramFiles', 'ProgramFiles(x86)']:
             base_path = os.environ.get(path_var)
-            if base_path:
-                full_path = os.path.join(base_path, "Tailscale", "tailscale.exe")
-                if os.path.exists(full_path):
-                    return full_path
+            if base_path and os.path.exists(os.path.join(base_path, "Tailscale", "tailscale.exe")):
+                return os.path.join(base_path, "Tailscale", "tailscale.exe")
         return None
 
     def run_command(self, command, check=True):
@@ -73,22 +73,17 @@ class VpnLogic:
 
     def get_status(self, exit_node_ip):
         status = {'raspi_status': 'Offline', 'internet_status': 'Offline', 'ping_ms': 'N/A'}
-
-        # Check Internet Status (ping google.com)
         try:
             self.run_command(['ping', '-n', '1', '-w', '1000', 'google.com'], check=True)
             status['internet_status'] = 'Online'
         except Exception:
             status['internet_status'] = 'Offline'
-
-        # Check Raspberry Pi Status and Ping
         if exit_node_ip:
             try:
                 ping_res = self.run_command(['ping', '-n', '1', '-w', '1000', exit_node_ip], check=True).stdout
                 status['raspi_status'] = 'Online'
                 match = re.search(r"time(?:<|=)(\d+)ms", ping_res, re.IGNORECASE)
-                if match:
-                    status['ping_ms'] = f"{match.group(1)} ms"
+                if match: status['ping_ms'] = f"{match.group(1)} ms"
             except Exception:
                 status['raspi_status'] = 'Offline'
                 status['ping_ms'] = 'Timeout'
@@ -115,26 +110,29 @@ class App(Tk):
 
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
 
+    def _ensure_config_dir(self):
+        if not os.path.exists(APP_DATA_PATH):
+            os.makedirs(APP_DATA_PATH)
+
     def _load_config(self):
+        self._ensure_config_dir()
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r') as f: self.exit_node_ip.set(json.load(f).get("exit_node_ip", ""))
 
     def _save_config(self):
+        self._ensure_config_dir()
         with open(CONFIG_FILE, 'w') as f: json.dump({"exit_node_ip": self.exit_node_ip.get()}, f)
 
     def _create_widgets(self):
         controls_frame = Frame(self, padx=15, pady=15, bg=Colors["BG"])
         controls_frame.pack(fill='x', side='top')
         Label(controls_frame, text="Raspberry Pi (Exit Node) IP:", bg=Colors["BG"], fg=Colors["FG"], font=("Helvetica", 10)).pack(anchor='w')
-        self.ip_entry = Entry(controls_frame, textvariable=self.exit_node_ip, bg=Colors["ENTRY_BG"], fg=Colors["ENTRY_FG"], insertbackground=Colors["FG"], relief='flat', width=40)
-        self.ip_entry.pack(fill='x', pady=5)
+        Entry(controls_frame, textvariable=self.exit_node_ip, bg=Colors["ENTRY_BG"], fg=Colors["ENTRY_FG"], insertbackground=Colors["FG"], relief='flat', width=40).pack(fill='x', pady=5)
 
         buttons_frame = Frame(controls_frame, bg=Colors["BG"])
         buttons_frame.pack(pady=10)
-        self.connect_button = Button(buttons_frame, text="Enable VPN", command=self._connect_action, bg=Colors["SUCCESS"], fg=Colors["BUTTON_FG"], relief='flat', font=("Helvetica", 10, "bold"), width=15)
-        self.connect_button.pack(side='left', padx=10)
-        self.disconnect_button = Button(buttons_frame, text="Disable VPN", command=self._disconnect_action, bg=Colors["ERROR"], fg=Colors["BUTTON_FG"], relief='flat', font=("Helvetica", 10, "bold"), width=15)
-        self.disconnect_button.pack(side='left', padx=10)
+        Button(buttons_frame, text="Enable VPN", command=self._connect_action, bg=Colors["SUCCESS"], fg=Colors["BUTTON_FG"], relief='flat', font=("Helvetica", 10, "bold"), width=15).pack(side='left', padx=10)
+        Button(buttons_frame, text="Disable VPN", command=self._disconnect_action, bg=Colors["ERROR"], fg=Colors["BUTTON_FG"], relief='flat', font=("Helvetica", 10, "bold"), width=15).pack(side='left', padx=10)
 
         status_frame = Frame(self, padx=15, pady=10, bg=Colors["BG"])
         status_frame.pack(fill='both', expand=True)
@@ -176,8 +174,7 @@ class App(Tk):
 
     def _update_vpn_indicator(self, status):
         canvas, indicator_id = self.status_widgets['vpn_status']
-        color = Colors["SUCCESS"] if status == 'Enabled' else Colors["ERROR"]
-        canvas.itemconfig(indicator_id, fill=color)
+        canvas.itemconfig(indicator_id, fill=Colors["SUCCESS"] if status == 'Enabled' else Colors["ERROR"])
 
     def _run_initial_checks(self):
         if not self.vpn.tailscale_path:
@@ -195,8 +192,7 @@ class App(Tk):
         for key, s in status.items():
             if key in self.status_widgets:
                 canvas, indicator_id = self.status_widgets[key]
-                color = Colors["SUCCESS"] if s in ['Online', 'Enabled'] else Colors["ERROR"]
-                canvas.itemconfig(indicator_id, fill=color)
+                canvas.itemconfig(indicator_id, fill=Colors["SUCCESS"] if s == 'Online' else Colors["ERROR"])
         self.ping_label.config(text=status['ping_ms'])
 
     def _on_closing(self):

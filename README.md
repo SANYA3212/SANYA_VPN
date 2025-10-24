@@ -75,6 +75,29 @@ The architecture is a straightforward client-server model:
 3.  **Connect:** Click **"Enable VPN"**. The status indicators will turn green as the connection is established.
 4.  **Disconnect:** Click **"Disable VPN"** to stop routing traffic through the exit node.
 
+## Compiling to .EXE (for Windows)
+
+You can compile the client script into a single, standalone `.exe` file for easy distribution and use.
+
+1.  **Install PyInstaller:**
+    Open a command prompt, activate your virtual environment (if you created one), and run:
+    ```bash
+    pip install pyinstaller
+    ```
+
+2.  **Run the Build Command:**
+    Navigate to the root directory of the project in your command prompt and execute the following command:
+    ```bash
+    pyinstaller --name "SANYA-VPN" --onefile --windowed --icon=NONE client/client_vpn_setup.py
+    ```
+    *   `--name "SANYA-VPN"`: Sets the name of the output executable.
+    *   `--onefile`: Bundles everything into a single `.exe` file.
+    *   `--windowed`: Prevents a console window from appearing when you run the application.
+    *   `--icon=NONE`: You can replace `NONE` with a path to a `.ico` file to give your application a custom icon.
+
+3.  **Find the Executable:**
+    PyInstaller will create a `dist` folder in your project directory. Inside, you will find `SANYA-VPN.exe`. You can move this file anywhere on your system and run it.
+
 ## Troubleshooting FAQ
 
 *   **Server script fails with a "must be run as root" error.**
