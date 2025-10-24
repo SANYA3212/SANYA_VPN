@@ -40,8 +40,6 @@ Colors = {
 }
 
 # --- Logging Setup ---
-# Setup a dummy logger that does nothing to keep the VpnLogic class clean
-# while removing the visual log console from the UI.
 logging.basicConfig(level=logging.CRITICAL, format='%(asctime)s - %(message)s')
 
 # --- Core VPN Logic ---
@@ -55,9 +53,7 @@ class VpnLogic:
             if base_path:
                 full_path = os.path.join(base_path, "Tailscale", "tailscale.exe")
                 if os.path.exists(full_path):
-                    logging.info(f"Found Tailscale at: {full_path}")
                     return full_path
-        logging.warning("tailscale.exe not found.")
         return None
 
     def run_command(self, command, check=True):
@@ -68,33 +64,15 @@ class VpnLogic:
             encoding=locale.getpreferredencoding(), startupinfo=startupinfo
         )
 
-    def login(self):
-        if "Logged out" not in self.run_command([self.tailscale_path, 'status'], check=False).stdout:
-            return
-        self.run_command([self.tailscale_path, 'up'])
-
     def connect_to_exit_node(self, node_id):
         if not node_id: return
-        try:
-            self.run_command([self.tailscale_path, 'up', f'--exit-node={node_id}', '--accept-routes'])
-        except subprocess.CalledProcessError:
-            logging.error("Failed to connect. Is the exit node approved?")
+        self.run_command([self.tailscale_path, 'up', f'--exit-node={node_id}', '--accept-routes'], check=False)
 
     def disconnect_from_exit_node(self):
         self.run_command([self.tailscale_path, 'set', '--exit-node='])
 
     def get_status(self, exit_node_ip):
-        status = {'vpn_status': 'Disabled', 'raspi_status': 'Offline', 'internet_status': 'Offline', 'ping_ms': 'N/A'}
-        if not self.tailscale_path: return status
-
-        # Check VPN Status from Tailscale output
-        try:
-            ts_status_out = self.run_command([self.tailscale_path, 'status'], check=True).stdout
-            # A more reliable check for an active exit node.
-            if "exit node: " in ts_status_out:
-                status['vpn_status'] = 'Enabled'
-        except Exception:
-            status['vpn_status'] = 'Disabled'
+        status = {'raspi_status': 'Offline', 'internet_status': 'Offline', 'ping_ms': 'N/A'}
 
         # Check Internet Status (ping google.com)
         try:
@@ -108,14 +86,12 @@ class VpnLogic:
             try:
                 ping_res = self.run_command(['ping', '-n', '1', '-w', '1000', exit_node_ip], check=True).stdout
                 status['raspi_status'] = 'Online'
-                # Universal regex for ping time, looks for "Average = 123ms" or "Среднее = 123 мс"
-                match = re.search(r"(?:Average|Среднее)\s*=\s*(\d+)", ping_res)
+                match = re.search(r"time(?:<|=)(\d+)ms", ping_res, re.IGNORECASE)
                 if match:
                     status['ping_ms'] = f"{match.group(1)} ms"
             except Exception:
                 status['raspi_status'] = 'Offline'
                 status['ping_ms'] = 'Timeout'
-
         return status
 
 # --- GUI Application ---
@@ -192,15 +168,21 @@ class App(Tk):
             messagebox.showwarning("Input Required", "Please enter the Raspberry Pi's IP.")
             return
         self._run_in_thread(self.vpn.connect_to_exit_node, self.exit_node_ip.get())
+        self._update_vpn_indicator('Enabled')
 
     def _disconnect_action(self):
         self._run_in_thread(self.vpn.disconnect_from_exit_node)
+        self._update_vpn_indicator('Disabled')
+
+    def _update_vpn_indicator(self, status):
+        canvas, indicator_id = self.status_widgets['vpn_status']
+        color = Colors["SUCCESS"] if status == 'Enabled' else Colors["ERROR"]
+        canvas.itemconfig(indicator_id, fill=color)
 
     def _run_initial_checks(self):
         if not self.vpn.tailscale_path:
             if messagebox.askyesno("Tailscale Not Found", "Download Tailscale?"): webbrowser.open(TAILSCALE_DOWNLOAD_URL)
             self.destroy()
-        else: self._run_in_thread(self.vpn.login)
 
     def _update_status_periodically(self):
         def worker():
@@ -223,10 +205,8 @@ class App(Tk):
         self.destroy()
 
 def main():
-    if platform.system() != "Windows":
-        messagebox.showerror("Error", "This application is for Windows only.")
-        sys.exit(1)
-    App().mainloop()
+    if platform.system() != "Windows": messagebox.showerror("Error", "This application is for Windows only.")
+    else: App().mainloop()
 
 if __name__ == "__main__":
     main()
