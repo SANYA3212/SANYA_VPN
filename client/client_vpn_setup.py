@@ -111,7 +111,7 @@ class App(Tk):
         self.ping_q = queue.Queue()
         self.ping_thread = None
         self.exit_node_ip = StringVar()
-        self.exit_node_ip.trace_add("w", self.on_ip_change)
+        self.exit_node_ip.trace_add("write", self.on_ip_change)
         self._load_config()
 
         self._create_widgets()
