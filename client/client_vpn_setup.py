@@ -19,7 +19,6 @@ import json
 import locale
 import re
 import queue
-import time
 from tkinter import Tk, Label, Button, Frame, Entry, StringVar, messagebox, Canvas
 
 # --- Constants ---
@@ -28,7 +27,7 @@ APP_TITLE = f"{APP_NAME} Client"
 WINDOW_GEOMETRY = "480x320"
 TAILSCALE_DOWNLOAD_URL = "https://tailscale.com/download/windows"
 IS_WINDOWS = platform.system() == "Windows"
-PING_RE = re.compile(r'(?:time|время)\s*[=<]\s*([0-9]+(?:\.[0-9]+)?)\s*(?:ms|мс)', re.IGNORECASE)
+PING_RE = re.compile(r'(?:time|время)\s*[=<]\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.IGNORECASE)
 
 # --- Configuration Path ---
 APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), APP_NAME)
@@ -41,10 +40,11 @@ Colors = {
 
 # --- Background Ping Thread ---
 class PingThread(threading.Thread):
-    def __init__(self, host, q):
+    def __init__(self, host, q, ping_type):
         super().__init__(daemon=True)
         self.host = host
         self.q = q
+        self.ping_type = ping_type
         self.stop_event = threading.Event()
 
     def stop(self):
@@ -62,7 +62,7 @@ class PingThread(threading.Thread):
             if not line: continue
 
             m = PING_RE.search(line.strip())
-            if m: self.q.put(("ping", f"{m.group(1)} ms"))
+            if m: self.q.put((self.ping_type, m.group(1)))
 
         proc.terminate()
 
@@ -89,15 +89,6 @@ class VpnLogic:
     def disconnect(self):
         self.run_command([self.tailscale_path, 'set', '--exit-node='])
 
-    def check_internet(self):
-        try:
-            # Use CREATE_NO_WINDOW flag to prevent console pop-up.
-            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            subprocess.run(['ping', '-n', '1', '-w', '1000', '8.8.8.8'], check=True, capture_output=True, creationflags=flags)
-            return 'Online'
-        except Exception:
-            return 'Offline'
-
 # --- GUI Application ---
 class App(Tk):
     def __init__(self):
@@ -108,17 +99,18 @@ class App(Tk):
         self.resizable(False, False)
 
         self.vpn = VpnLogic()
-        self.ping_q = queue.Queue()
-        self.ping_thread = None
+        self.q = queue.Queue()
+        self.raspi_ping_thread = None
+        self.internet_ping_thread = None
         self.exit_node_ip = StringVar()
         self.exit_node_ip.trace_add("write", self.on_ip_change)
         self._load_config()
 
         self._create_widgets()
 
-        self.after(100, self._check_ping_queue)
+        self.after(100, self._check_queue)
         self.after(500, self._run_initial_checks)
-        self.after(1000, self._update_internet_status)
+        self.start_internet_ping()
 
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
 
@@ -185,39 +177,44 @@ class App(Tk):
         canvas.itemconfig(indicator_id, fill=Colors["SUCCESS"] if status in ['Online', 'Enabled'] else Colors["ERROR"])
 
     def on_ip_change(self, *args):
-        if self.ping_thread: self.ping_thread.stop()
+        if self.raspi_ping_thread: self.raspi_ping_thread.stop()
         ip = self.exit_node_ip.get()
         if ip:
-            self.ping_thread = PingThread(ip, self.ping_q)
-            self.ping_thread.start()
+            self.raspi_ping_thread = PingThread(ip, self.q, "raspi_ping")
+            self.raspi_ping_thread.start()
         else:
             self.ping_label.config(text="N/A")
             self._set_indicator('raspi', 'Offline')
 
-    def _check_ping_queue(self):
+    def start_internet_ping(self):
+        if self.internet_ping_thread: self.internet_ping_thread.stop()
+        self.internet_ping_thread = PingThread("google.com", self.q, "internet_ping")
+        self.internet_ping_thread.start()
+
+    def _check_queue(self):
         try:
             while True:
-                typ, val = self.ping_q.get_nowait()
-                if typ == "ping":
-                    self.ping_label.config(text=val)
+                typ, val = self.q.get_nowait()
+                if typ == "raspi_ping":
+                    self.ping_label.config(text=f"{val} ms")
                     self._set_indicator('raspi', 'Online')
+                elif typ == "internet_ping":
+                    ping_val = float(val)
+                    if 0 < ping_val < 600:
+                        self._set_indicator('internet', 'Online')
+                    else:
+                        self._set_indicator('internet', 'Offline')
         except queue.Empty: pass
-        self.after(100, self._check_ping_queue)
+        self.after(100, self._check_queue)
 
     def _run_initial_checks(self):
         if not self.vpn.tailscale_path and messagebox.askyesno("Tailscale Not Found", "Download Tailscale?"):
             webbrowser.open(TAILSCALE_DOWNLOAD_URL)
             self.destroy()
 
-    def _update_internet_status(self):
-        def worker():
-            status = self.vpn.check_internet()
-            self.after(0, self._set_indicator, 'internet', status)
-            self.after(5000, self._update_internet_status)
-        self._run_in_thread(worker)
-
     def _on_closing(self):
-        if self.ping_thread: self.ping_thread.stop()
+        if self.raspi_ping_thread: self.raspi_ping_thread.stop()
+        if self.internet_ping_thread: self.internet_ping_thread.stop()
         self._save_config()
         self.destroy()
 
