@@ -1,0 +1,47 @@
+# SANYA-VPN Server: Manual Setup Commands
+# This file lists the key commands executed by the server_vpn_setup.py script.
+# Use these for manual debugging or setup on a Raspberry Pi.
+# All commands should be run with sudo.
+
+# --- 1. Installation ---
+# Install Tailscale (if not already installed)
+curl -fsSL https://tailscale.com/install.sh | sh
+
+# --- 2. Service Management ---
+# Enable and start the Tailscale daemon
+sudo systemctl enable --now tailscaled
+sudo systemctl start tailscaled
+
+# --- 3. Login & Configuration ---
+# Log in to your Tailscale account (interactive)
+# The '--advertise-exit-node' flag is crucial.
+sudo tailscale up --advertise-exit-node
+
+# OR log in using a pre-generated authentication key (for headless setup)
+# export TS_AUTHKEY="your_auth_key_here"
+# sudo tailscale up --auth-key $TS_AUTHKEY --advertise-exit-node
+
+# --- 4. Enable IP Forwarding ---
+# Create a sysctl configuration file to make forwarding persistent
+echo 'net.ipv4.ip_forward=1' | sudo tee /etc/sysctl.d/99-tailscale-forwarding.conf
+echo 'net.ipv6.conf.all.forwarding=1' | sudo tee -a /etc/sysctl.d/99-tailscale-forwarding.conf
+
+# Apply the settings immediately
+sudo sysctl -p /etc/sysctl.d/99-tailscale-forwarding.conf
+
+# --- 5. Diagnostics ---
+# Check Tailscale status and connectivity
+tailscale status
+tailscale ip -4
+
+# Verify network configuration
+ip addr
+ip route
+
+# Test internet routing
+traceroute 8.8.8.8
+curl https://ifconfig.me
+
+# --- IMPORTANT ---
+# After running these commands, you MUST approve the exit node in the
+# Tailscale admin console: https://login.tailscale.com/admin/machines
