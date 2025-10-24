@@ -27,10 +27,15 @@ APP_TITLE = f"{APP_NAME} Client"
 WINDOW_GEOMETRY = "480x320"
 TAILSCALE_DOWNLOAD_URL = "https://tailscale.com/download/windows"
 IS_WINDOWS = platform.system() == "Windows"
-PING_RE = re.compile(r'(?:time|время)\s*[=<]\s*([0-9]+(?:\.[0-9]+)?)\s*ms', re.IGNORECASE)
+PING_RE = re.compile(r'(?:time|время)\s*[=<]\s*([0-9]+(?:\.[0-9]+)?)\s*(?:ms|мс)', re.IGNORECASE)
 
 # --- Configuration Path ---
-APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), APP_NAME)
+if IS_WINDOWS:
+    APP_DATA_PATH = os.path.join(os.getenv('APPDATA'), APP_NAME)
+else:
+    # This is a Windows-only app, but we need a placeholder for other OSes
+    # to avoid crashing on import. The main() function prevents execution.
+    APP_DATA_PATH = "/tmp/sanya-vpn-dummy-config"
 CONFIG_FILE = os.path.join(APP_DATA_PATH, "config.json")
 
 # --- Dark Theme Colors ---
@@ -52,17 +57,22 @@ class PingThread(threading.Thread):
 
     def run(self):
         cmd = ["ping", self.host, "-t"]
-        encoding = "cp866"
-        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        encoding = "cp866" if IS_WINDOWS else "utf-8"
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if IS_WINDOWS else 0
+
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding=encoding, bufsize=1, creationflags=flags)
 
         while not self.stop_event.is_set():
             line = proc.stdout.readline()
-            if not line and proc.poll() is not None: break
-            if not line: continue
+            if not line and proc.poll() is not None:
+                self.q.put((f"{self.ping_type}_status", "Offline"))
+                break
+            if not line:
+                continue
 
             m = PING_RE.search(line.strip())
-            if m: self.q.put((self.ping_type, m.group(1)))
+            if m:
+                self.q.put((self.ping_type, m.group(1)))
 
         proc.terminate()
 
@@ -204,6 +214,10 @@ class App(Tk):
                         self._set_indicator('internet', 'Online')
                     else:
                         self._set_indicator('internet', 'Offline')
+                elif typ == "raspi_ping_status":
+                    self._set_indicator('raspi', val)
+                elif typ == "internet_ping_status":
+                    self._set_indicator('internet', val)
         except queue.Empty: pass
         self.after(100, self._check_queue)
 
