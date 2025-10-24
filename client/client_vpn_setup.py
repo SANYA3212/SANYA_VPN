@@ -172,7 +172,8 @@ class App(Tk):
         frame = Frame(parent, bg=Colors["BG"]); frame.pack(fill='x', pady=5)
         Label(frame, text=text, bg=Colors["BG"], fg=Colors["FG"], font=("Helvetica", 11)).pack(side='left')
         canvas = Canvas(frame, width=20, height=20, bg=Colors["BG"], highlightthickness=0); canvas.pack(side='right')
-        return canvas.create_oval(5, 5, 18, 18, fill=Colors["OFF"], outline="")
+        indicator_id = canvas.create_oval(5, 5, 18, 18, fill=Colors["OFF"], outline="")
+        return canvas, indicator_id
 
     def _create_ping_display(self, parent, text):
         frame = Frame(parent, bg=Colors["BG"]); frame.pack(fill='x', pady=5)
@@ -210,10 +211,9 @@ class App(Tk):
     def _update_ui(self, status):
         for key, s in status.items():
             if key in self.status_widgets:
-                canvas = self.status_widgets[key].master
-                indicator = self.status_widgets[key]
+                canvas, indicator_id = self.status_widgets[key]
                 color = Colors["SUCCESS"] if s in ['Online', 'Enabled'] else Colors["ERROR"]
-                canvas.itemconfig(indicator, fill=color)
+                canvas.itemconfig(indicator_id, fill=color)
         self.ping_label.config(text=status['ping_ms'])
 
     def _on_closing(self):
