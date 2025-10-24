@@ -19,7 +19,8 @@ import threading
 import time
 import queue
 import json
-from tkinter import Tk, Label, Button, Frame, Entry, StringVar, messagebox, Canvas
+import locale
+from tkinter import Tk, Label, Button, Frame, Entry, StringVar, messagebox, Canvas, END
 from tkinter.scrolledtext import ScrolledText
 
 # --- Constants ---
@@ -90,7 +91,7 @@ class VpnLogic:
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         result = subprocess.run(
             command, capture_output=True, text=True, check=check,
-            encoding='utf-8', startupinfo=startupinfo
+            encoding=locale.getpreferredencoding(), startupinfo=startupinfo
         )
         if result.stdout: logging.info(f"Output: {result.stdout.strip()}")
         if result.stderr: logging.warning(f"Errors/Warnings: {result.stderr.strip()}")
@@ -121,9 +122,13 @@ class VpnLogic:
             logging.error("Exit node IP cannot be empty.")
             return "Error: No IP"
         logging.info(f"Connecting to exit node: {node_id}...")
-        cmd = [self.tailscale_path, 'up', f'--exit-node={node_id}', '--accept-routes', '--accept-dns=true']
-        self.run_command(cmd)
-        return "Connection Attempted"
+        try:
+            cmd = [self.tailscale_path, 'up', f'--exit-node={node_id}', '--accept-routes', '--accept-dns=true']
+            self.run_command(cmd)
+            return "Connection Attempted"
+        except subprocess.CalledProcessError:
+            logging.error("Failed to connect. Is the exit node approved in the admin console?")
+            return "Connection Failed"
 
     def disconnect_from_exit_node(self):
         logging.info("Disconnecting from exit node...")
