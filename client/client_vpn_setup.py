@@ -207,7 +207,11 @@ class App(Tk):
                 typ, val = self.q.get_nowait()
                 if typ == "raspi_ping":
                     self.ping_label.config(text=f"{val} ms")
-                    self._set_indicator('raspi', 'Online')
+                    ping_val = float(val)
+                    if 0 < ping_val < 600:
+                        self._set_indicator('raspi', 'Online')
+                    else:
+                        self._set_indicator('raspi', 'Offline')
                 elif typ == "internet_ping":
                     ping_val = float(val)
                     if 0 < ping_val < 600:
