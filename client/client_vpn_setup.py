@@ -87,17 +87,18 @@ class VpnLogic:
         status = {'vpn_status': 'Disabled', 'raspi_status': 'Offline', 'internet_status': 'Offline', 'ping_ms': 'N/A'}
         if not self.tailscale_path: return status
 
+        # Check VPN Status from Tailscale output
         try:
-            # Check VPN Status from Tailscale output
             ts_status_out = self.run_command([self.tailscale_path, 'status'], check=True).stdout
-            if f"exit node: {exit_node_ip}" in ts_status_out or (f"exit node: " in ts_status_out and exit_node_ip in ts_status_out):
+            # A more reliable check for an active exit node.
+            if "exit node: " in ts_status_out:
                 status['vpn_status'] = 'Enabled'
         except Exception:
             status['vpn_status'] = 'Disabled'
 
-        # Check Internet Status (ping 8.8.8.8)
+        # Check Internet Status (ping google.com)
         try:
-            self.run_command(['ping', '-n', '1', '-w', '1000', '8.8.8.8'], check=True)
+            self.run_command(['ping', '-n', '1', '-w', '1000', 'google.com'], check=True)
             status['internet_status'] = 'Online'
         except Exception:
             status['internet_status'] = 'Offline'
@@ -107,8 +108,8 @@ class VpnLogic:
             try:
                 ping_res = self.run_command(['ping', '-n', '1', '-w', '1000', exit_node_ip], check=True).stdout
                 status['raspi_status'] = 'Online'
-                # Universal regex for ping time, looks for " = 123ms" or " = 123 мс"
-                match = re.search(r"=\s*(\d+)\s*ms", ping_res, re.IGNORECASE)
+                # Universal regex for ping time, looks for "Average = 123ms" or "Среднее = 123 мс"
+                match = re.search(r"(?:Average|Среднее)\s*=\s*(\d+)", ping_res)
                 if match:
                     status['ping_ms'] = f"{match.group(1)} ms"
             except Exception:
