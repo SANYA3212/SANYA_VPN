@@ -19,15 +19,20 @@ object TailscaleManager {
 
         return try {
             val json = org.json.JSONObject(jsonString)
-            val peer = json.getJSONObject("Peer")
-            val exitNodePeerID = json.optString("ExitNode", "")
+            val self = json.optJSONObject("Self")
+            val exitNodePeerID = self?.optString("ExitNodeID", "")
 
-            if (exitNodePeerID.isNotBlank()) {
-                for (key in peer.keys()) {
-                    val peerInfo = peer.getJSONObject(key)
-                    if (peerInfo.optString("ID") == exitNodePeerID) {
-                        return peerInfo.optString("TailscaleIPs").split(",").firstOrNull() ?: "N/A"
-                    }
+            if (exitNodePeerID.isNullOrBlank()) {
+                return "N/A"
+            }
+
+            val peer = json.getJSONObject("Peer")
+            val peerInfo = peer.optJSONObject(exitNodePeerID)
+
+            if (peerInfo != null) {
+                val ips = peerInfo.optJSONArray("TailscaleIPs")
+                if (ips != null && ips.length() > 0) {
+                    return ips.getString(0)
                 }
             }
             "N/A"
