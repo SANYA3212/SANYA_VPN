@@ -153,11 +153,6 @@ class App(Tk):
 
         self.protocol.set("OpenVPN (UDP)") # Set default protocol
 
-        # Add a button to open the config directory
-        config_button = Button(main_frame, text="Открыть папку с ca.crt", command=self._open_config_dir,
-                               bg=Colors["BUTTON"], fg="#282c34", relief='flat', font=("Helvetica", 9))
-        config_button.pack(pady=(0, 10))
-
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
 
     def _ensure_config_dir(self):
@@ -231,6 +226,11 @@ class App(Tk):
         scrollbar.pack(side='right', fill='y')
         self.exception_listbox.config(yscrollcommand=scrollbar.set)
         Button(split_tunnel_frame, text="Удалить выбранное", command=self._remove_exception, bg=Colors["ERROR"], fg="#282c34", relief='flat', font=("Helvetica", 9, "bold")).pack(pady=5)
+
+        # Add a button to open the config directory at the bottom
+        config_button = Button(main_frame, text="Открыть папку с ca.crt", command=self._open_config_dir,
+                               bg=Colors["BUTTON"], fg="#282c34", relief='flat', font=("Helvetica", 9))
+        config_button.pack(pady=(10, 0))
 
     def _run_in_thread(self, target, *args):
         threading.Thread(target=target, args=args, daemon=True).start()
