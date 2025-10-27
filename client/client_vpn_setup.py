@@ -136,14 +136,14 @@ class App(Tk):
         self.server_ip = StringVar()
         self.username = StringVar()
         self.password = StringVar()
-        self.protocol = StringVar()
+        self.protocol_var = StringVar()
         self.active_processes = StringVar()
 
         self._load_config()
         self._create_widgets()
         self._populate_processes()
 
-        self.protocol.set("OpenVPN (UDP)") # Set default protocol
+        self.protocol_var.set("OpenVPN (UDP)") # Set default protocol
 
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
 
@@ -187,7 +187,7 @@ class App(Tk):
         Entry(conn_frame, textvariable=self.password, show="*", bg=Colors["INPUT_BG"], fg=Colors["FG"], insertbackground=Colors["FG"], relief='flat', width=40).pack(fill='x', pady=2)
 
         Label(conn_frame, text="Протокол:", bg=Colors["BG"], fg=Colors["FG"], font=("Helvetica", 10)).pack(anchor='w', pady=(5,0))
-        protocol_menu = ttk.Combobox(conn_frame, textvariable=self.protocol, values=["OpenVPN (UDP)", "OpenVPN (TCP)"], state="readonly")
+        protocol_menu = ttk.Combobox(conn_frame, textvariable=self.protocol_var, values=["OpenVPN (UDP)", "OpenVPN (TCP)"], state="readonly")
         protocol_menu.pack(fill='x', pady=2)
 
         # --- Action Buttons ---
@@ -232,7 +232,7 @@ class App(Tk):
         ip = self.server_ip.get()
         user = self.username.get()
         pwd = self.password.get()
-        proto = self.protocol.get()
+        proto = self.protocol_var.get()
         if not all([ip, user, pwd, proto]):
             messagebox.showwarning("Внимание", "Пожалуйста, заполните все поля.")
             return
