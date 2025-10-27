@@ -65,7 +65,10 @@ def main():
     """
     Main function to orchestrate the server setup process.
     """
-    logging.info("SANYA-VPN OpenVPN Server Setup -- STARTING")
+    import argparse
+    parser = argparse.ArgumentParser(description="SANYA-VPN OpenVPN Server Setup")
+    parser.add_argument('--add-user', nargs=2, metavar=('USERNAME', 'PASSWORD'), help='Create a new VPN user.')
+    args = parser.parse_args()
 
     # 1. Check for sudo
     check_sudo()
@@ -75,19 +78,24 @@ def main():
         logging.error("This script is designed for Linux (Debian-based).")
         sys.exit(1)
 
-    install_openvpn()
-    setup_easyrsa()
-    create_server_config()
-
-    logging.info("SANYA-VPN OpenVPN Server Setup -- COMPLETE")
+    if args.add_user:
+        create_vpn_user(args.add_user[0], args.add_user[1])
+    else:
+        logging.info("SANYA-VPN OpenVPN Server Setup -- STARTING")
+        install_openvpn()
+        setup_easyrsa()
+        create_server_config()
+        logging.info("SANYA-VPN OpenVPN Server Setup -- COMPLETE")
+        logging.info("To add a user, run: sudo python3 server_vpn_setup.py --add-user <username> <password>")
 
 def install_openvpn():
-    """Installs OpenVPN and Easy-RSA."""
-    logging.info("Installing OpenVPN and Easy-RSA...")
+    """Installs OpenVPN, Easy-RSA, and the PAM authentication plugin."""
+    logging.info("Installing OpenVPN, Easy-RSA, and PAM plugin...")
     try:
         run_command(['apt-get', 'update'], check=True)
-        run_command(['apt-get', 'install', '-y', 'openvpn', 'easy-rsa'], check=True)
-        logging.info("OpenVPN and Easy-RSA installed successfully.")
+        # openvpn-auth-pam allows OpenVPN to authenticate against system users
+        run_command(['apt-get', 'install', '-y', 'openvpn', 'easy-rsa', 'openvpn-auth-pam'], check=True)
+        logging.info("OpenVPN, Easy-RSA, and PAM plugin installed successfully.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         logging.error(f"Failed to install packages: {e}")
         sys.exit(1)
@@ -156,6 +164,9 @@ persist-tun
 status openvpn-status.log
 verb 3
 explicit-exit-notify 1
+plugin /usr/lib/openvpn/openvpn-auth-pam.so login
+client-cert-not-required
+username-as-common-name
 """
     try:
         with open("/etc/openvpn/server.conf", "w") as f:
@@ -163,6 +174,23 @@ explicit-exit-notify 1
         logging.info("OpenVPN server.conf created.")
     except IOError as e:
         logging.error(f"Failed to write server configuration: {e}")
+        sys.exit(1)
+
+def create_vpn_user(username, password):
+    """Creates a new system user for VPN access, without a home directory."""
+    logging.info(f"Creating VPN user: {username}...")
+    try:
+        # --no-create-home: Don't create a home directory
+        # --shell /usr/sbin/nologin: Prevent shell access
+        run_command(['useradd', username, '--no-create-home', '--shell', '/usr/sbin/nologin'], check=True)
+        # Set the password for the new user
+        proc = subprocess.Popen(['passwd', username], stdin=subprocess.PIPE)
+        proc.stdin.write(f"{password}\n{password}\n".encode('utf-8'))
+        proc.stdin.close()
+        proc.wait()
+        logging.info(f"Successfully created user '{username}'.")
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        logging.error(f"Failed to create user '{username}': {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
