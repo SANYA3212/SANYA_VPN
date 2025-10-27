@@ -59,14 +59,6 @@ class VpnLogic:
         except (subprocess.CalledProcessError, FileNotFoundError):
             return None
 
-    def _open_config_dir(self):
-        """Opens the application's configuration directory in the file explorer."""
-        self._ensure_config_dir()
-        if platform.system() == "Windows":
-            os.startfile(APP_DATA_PATH)
-        else:
-            messagebox.showinfo("Информация", f"Папка с конфигурацией: {APP_DATA_PATH}")
-
     def connect(self, server_ip, username, password, protocol, whitelist_ips=None):
         """Establishes the VPN connection."""
         ca_path = os.path.join(APP_DATA_PATH, "ca.crt")
@@ -296,6 +288,14 @@ class App(Tk):
         # Iterate backwards to avoid index shifting issues
         for i in sorted(selected_indices, reverse=True):
             self.exception_listbox.delete(i)
+
+    def _open_config_dir(self):
+        """Opens the application's configuration directory in the file explorer."""
+        self._ensure_config_dir()
+        if platform.system() == "Windows":
+            os.startfile(APP_DATA_PATH)
+        else:
+            messagebox.showinfo("Информация", f"Папка с конфигурацией: {APP_DATA_PATH}")
 
     def _on_closing(self):
         self._save_config()
