@@ -65,11 +65,6 @@ def main():
     """
     Main function to orchestrate the server setup process.
     """
-    import argparse
-    parser = argparse.ArgumentParser(description="SANYA-VPN OpenVPN Server Setup")
-    parser.add_argument('--add-user', nargs=2, metavar=('USERNAME', 'PASSWORD'), help='Create a new VPN user.')
-    args = parser.parse_args()
-
     # 1. Check for sudo
     check_sudo()
 
@@ -78,15 +73,16 @@ def main():
         logging.error("This script is designed for Linux (Debian-based).")
         sys.exit(1)
 
-    if args.add_user:
-        create_vpn_user(args.add_user[0], args.add_user[1])
-    else:
-        logging.info("SANYA-VPN OpenVPN Server Setup -- STARTING")
-        install_openvpn()
-        setup_easyrsa()
-        create_server_config()
-        logging.info("SANYA-VPN OpenVPN Server Setup -- COMPLETE")
-        logging.info("To add a user, run: sudo python3 server_vpn_setup.py --add-user <username> <password>")
+    logging.info("SANYA-VPN OpenVPN Server Setup -- STARTING")
+    install_openvpn()
+    setup_easyrsa()
+    create_server_config()
+
+    # Create the default user
+    create_vpn_user("SANYAPI", "l1galv9n")
+
+    logging.info("SANYA-VPN OpenVPN Server Setup -- COMPLETE")
+    logging.info("Default user 'SANYAPI' has been created.")
 
 def install_openvpn():
     """Installs OpenVPN, Easy-RSA, and the PAM authentication plugin."""
