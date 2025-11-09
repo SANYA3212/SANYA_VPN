@@ -102,8 +102,8 @@ def install_openvpn():
     logging.info("Installing OpenVPN, Easy-RSA, and PAM plugin...")
     try:
         run_command(['apt-get', 'update'], check=True)
-        # openvpn-auth-pam allows OpenVPN to authenticate against system users
-        run_command(['apt-get', 'install', '-y', 'openvpn', 'easy-rsa', 'openvpn-auth-pam'], check=True)
+        # openvpn-plugin-auth-pam allows OpenVPN to authenticate against system users
+        run_command(['apt-get', 'install', '-y', 'openvpn', 'easy-rsa', 'openvpn-plugin-auth-pam'], check=True)
         logging.info("OpenVPN, Easy-RSA, and PAM plugin installed successfully.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         logging.error(f"Failed to install packages: {e}")
