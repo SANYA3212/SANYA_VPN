@@ -211,7 +211,6 @@ class App(Tk):
             os.makedirs(KEYS_PATH)
 
     def _load_config(self):
-        self._ensure_config_dir()
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r') as f:
                 config = json.load(f)
@@ -219,7 +218,6 @@ class App(Tk):
                 self.username.set(config.get("username", ""))
 
     def _save_config(self):
-        self._ensure_config_dir()
         config = {
             "server_ip": self.server_ip.get(),
             "username": self.username.get()
