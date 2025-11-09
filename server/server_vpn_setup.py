@@ -16,6 +16,11 @@ import logging
 import platform
 import time
 
+# --- USER CONFIGURATION ---
+# PLEASE REPLACE THIS WITH YOUR SERVER'S PUBLIC IP ADDRESS
+SERVER_PUBLIC_IP = "YOUR_IP_HERE"
+# --- END USER CONFIGURATION ---
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -65,10 +70,15 @@ def main():
     """
     Main function to orchestrate the server setup process.
     """
-    # 1. Check for sudo
+    # 1. Check if IP address is set
+    if SERVER_PUBLIC_IP == "YOUR_IP_HERE":
+        logging.error("Please edit the script and set the SERVER_PUBLIC_IP variable.")
+        sys.exit(1)
+
+    # 2. Check for sudo
     check_sudo()
 
-    # 2. Check for Linux
+    # 3. Check for Linux
     if platform.system() != "Linux":
         logging.error("This script is designed for Linux (Debian-based).")
         sys.exit(1)
@@ -80,6 +90,9 @@ def main():
 
     # Create the default user
     create_vpn_user("SANYAPI", "l1galv9n")
+
+    # Generate the client .ovpn file
+    generate_client_config(SERVER_PUBLIC_IP)
 
     logging.info("SANYA-VPN OpenVPN Server Setup -- COMPLETE")
     logging.info("Default user 'SANYAPI' has been created.")
@@ -187,6 +200,54 @@ def create_vpn_user(username, password):
         logging.info(f"Successfully created user '{username}'.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         logging.error(f"Failed to create user '{username}': {e}")
+        sys.exit(1)
+
+def generate_client_config(server_ip):
+    """Generates a .ovpn file for the client."""
+    logging.info("Generating client configuration file (SANYA-VPN.ovpn)...")
+    ca_path = "/etc/openvpn/keys/ca.crt"
+    try:
+        with open(ca_path, 'r') as f:
+            ca_content = f.read()
+
+        client_config = f"""
+client
+dev tun
+proto udp
+remote {server_ip} 1194
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+cipher AES-256-CBC
+verb 3
+auth-user-pass
+
+<ca>
+{ca_content}
+</ca>
+"""
+        # Find the home directory of the user who invoked sudo
+        sudo_user = os.environ.get('SUDO_USER')
+        if sudo_user:
+            output_path = f"/home/{sudo_user}/SANYA-VPN.ovpn"
+        else:
+            # Fallback to current directory if SUDO_USER is not set
+            output_path = "SANYA-VPN.ovpn"
+
+        with open(output_path, 'w') as f:
+            f.write(client_config)
+
+        # Set correct ownership for the file
+        if sudo_user:
+            run_command(['chown', f'{sudo_user}:{sudo_user}', output_path], check=True)
+
+        logging.info(f"Client configuration saved to: {output_path}")
+        logging.info("Please transfer this file to your client machine.")
+
+    except (IOError, FileNotFoundError) as e:
+        logging.error(f"Failed to generate client config: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
