@@ -114,6 +114,11 @@ def setup_easyrsa():
     logging.info("Setting up Easy-RSA and generating certificates...")
     easyrsa_dir = '/etc/openvpn/easy-rsa'
     try:
+        # Clean up any previous attempts to ensure a fresh start
+        if os.path.exists(easyrsa_dir):
+            logging.warning(f"Removing existing directory to ensure a clean setup: {easyrsa_dir}")
+            run_command(['rm', '-rf', easyrsa_dir], check=True)
+
         # Create the Easy-RSA directory
         run_command(['make-cadir', easyrsa_dir], check=True)
 
