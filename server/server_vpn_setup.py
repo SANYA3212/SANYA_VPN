@@ -99,12 +99,12 @@ def main():
 
 def install_openvpn():
     """Installs OpenVPN, Easy-RSA, and the PAM authentication plugin."""
-    logging.info("Installing OpenVPN, Easy-RSA, and PAM plugin...")
+    logging.info("Installing OpenVPN and Easy-RSA...")
     try:
         run_command(['apt-get', 'update'], check=True)
-        # openvpn-plugin-auth-pam allows OpenVPN to authenticate against system users
-        run_command(['apt-get', 'install', '-y', 'openvpn', 'easy-rsa', 'openvpn-plugin-auth-pam'], check=True)
-        logging.info("OpenVPN, Easy-RSA, and PAM plugin installed successfully.")
+        # On Debian Bookworm and newer, the auth-pam plugin is included in the 'openvpn' package itself
+        run_command(['apt-get', 'install', '-y', 'openvpn', 'easy-rsa'], check=True)
+        logging.info("OpenVPN and Easy-RSA installed successfully.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         logging.error(f"Failed to install packages: {e}")
         sys.exit(1)
