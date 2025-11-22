@@ -15,6 +15,7 @@ import sys
 import logging
 import platform
 import time
+import pwd
 
 # --- USER CONFIGURATION ---
 # PLEASE REPLACE THIS WITH YOUR SERVER'S PUBLIC IP ADDRESS
@@ -236,9 +237,11 @@ auth-user-pass
         # Find the home directory of the user who invoked sudo
         sudo_user = os.environ.get('SUDO_USER')
         if sudo_user:
-            output_path = f"/home/{sudo_user}/SANYA-VPN.ovpn"
+            # Correctly get the home directory for any user, including root
+            user_home = pwd.getpwnam(sudo_user).pw_dir
+            output_path = os.path.join(user_home, "SANYA-VPN.ovpn")
         else:
-            # Fallback to current directory if SUDO_USER is not set
+            # Fallback to current directory if SUDO_USER is not set (e.g., direct root login)
             output_path = "SANYA-VPN.ovpn"
 
         with open(output_path, 'w') as f:
